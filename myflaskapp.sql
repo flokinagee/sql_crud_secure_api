@@ -27,6 +27,7 @@ SET time_zone = "+00:00";
 --
 -- Table structure for table `articles`
 --
+use myflaskapp;
 
 CREATE TABLE `articles` (
   `id` int(11) NOT NULL,

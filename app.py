@@ -1,16 +1,27 @@
-from flask import Flask, render_template, url_for, flash, redirect, session, logging, request
+import sys
+sys.path.insert(0, '/Users/mahaakutty/Library/homebrew/lib/python3.7/site-packages')
+from flask import Flask, render_template, url_for, flash, redirect, session, logging, request, jsonify
 import mysql.connector
 from wtforms import Form, StringField, TextAreaField, PasswordField, validators
 from passlib.hash import sha256_crypt
 from functools import wraps
 
+# Define JWT
+from flask_jwt_extended import (
+    JWTManager, jwt_required, create_access_token,
+    get_jwt_identity
+)
+
 app = Flask(__name__)
+# Setup the Flask-JWT-Extended extension
+app.config['JWT_SECRET_KEY'] = 'nagarajans'  # Change this!
+jwt = JWTManager(app)
 
 # Config MySQL
 mydb = mysql.connector.connect(
     host="localhost",
     user="root",
-    passwd="",
+    passwd="naga1234",
     database="myflaskapp"
 )
 
@@ -199,6 +210,117 @@ def delete_article(id):
     flash('Article Deleted', 'success')
     return redirect(url_for('dashboard'))
 
+# API SECTION
+@app.route('/api/v1/login', methods=['GET', 'POST'])
+def api_login():
+    if request.method == 'POST':
+        username = request.form['username']
+        password_candidate = request.form['password']
+
+        mycursor = mydb.cursor(dictionary=True)
+        mycursor.execute("SELECT * FROM users WHERE username = %s", [username])
+        result = mycursor.fetchone()
+        if result:
+            password = result['password']
+            if sha256_crypt.verify(password_candidate, password):
+                session['logged_in'] = True
+                session['username'] = username
+
+                # flash('You are now logged in', 'success')
+                # return redirect(url_for('dashboard'))
+                # Identity can be any data that is json serializable
+                access_token = create_access_token(identity=username)
+                return jsonify(access_token=access_token), 200
+            else:
+                error = 'Invalid login'
+                return jsonify(error), 403
+            mycursor.close()
+        else:
+            error = 'Username not found'
+            return jsonify(error), 403
+    return jsonify("username not found"), 403
+
+# Dashboard API
+@app.route('/api/v1/dashboard')
+@jwt_required
+def api_dashboard():
+    mycursor = mydb.cursor(dictionary=True)
+    mycursor.execute("SELECT * FROM articles WHERE author = %s", [session['username']])
+    result = mycursor.fetchall()
+    if result:
+        return render_template('dashboard.html', articles=result)
+    else:
+        msg = 'No Articles Found'
+        return render_template('dashboard.html', msg=msg)
+    mycursor.close()
+
+# @app.route('/api/v1/adduser')
+# def api_add_user():
+#         _json = request.json
+#         customer_id = _json['customer_id']
+#         name = _json['name']
+#         email = _json['email']
+#         surname = _json['surname']
+#         # validate the received values
+#         if name and email and password and request.method == 'POST':
+#             # save details
+#             id = db.add({'customer_id': customer_id, 'name': name, 'email': email, 'surname': surname})
+#             resp = jsonify('User added successfully!')
+#             resp.status_code = 200
+#             return resp
+#         else:
+#             return not_found()
+
+
+# @app.route('/api/v1/listusers')
+# def api_get_users():
+#         try:
+#                 rows = db.get_data()
+#                 resp = dumps(rows, indent=4)
+#                 # resp = json.dumps(rows, indent=4)
+#                 return resp
+#         except Exception as e:
+#                 print(e)
+
+# @app.route('/api/v1/listuser/<customer_id>')
+# def api_get_user(customer_id):
+#         try:
+#                 user = db.get_customer(customer_id)
+#                 resp = dumps(rows, indent=4)
+#                 # resp = json.dumps(user, indent=4)
+#                 return resp
+#         except Exception as e:
+#                 print(e)
+
+# @app.route('/api/v1/update/<customer_id>', methods=['PUT'])
+# def api_update_user(customer_id):
+#     try:
+#         _json = request.json
+#         customer_id = _json['customer_id']
+#         name = _json['name']
+#         email = _json['email']
+#         surname = _json['surname']
+#         # validate the received values
+#         if name and email and surname and customer_id and request.method == 'PUT':
+#             # save edits
+#             db.update({'customer_id': customer_id, 'name': name, 'email': email, 'surname': surname})
+#             resp = jsonify('User updated successfully!')
+#             resp.status_code = 200
+#             return resp
+#         else:
+#             return not_found()
+#     except Exception as e:
+#         print(e)
+#         print("in update")
+
+# @app.route('/api/v1/delete/<customer_id>', methods=['DELETE'])
+# def api_delete_user(customer_id):
+# 	db.delete(customer_id)
+# 	resp = jsonify('User deleted successfully!')
+# 	resp.status_code = 200
+# 	return resp
+
+
 if __name__ == "__main__":
-    app.secret_key = '0b579d376dc5dde856e0a0ddca6f403cc8707924ff8d6d31'
+    app.secret_key = 'nagarajan'
     app.run(debug=True)
